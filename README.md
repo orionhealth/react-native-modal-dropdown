@@ -85,6 +85,8 @@ Prop                | Type     | Optional | Default   | Description
 `onSelect`          | func     | Yes      |           | Trigger when option row touched with selected `index` and `value`. **Return `false` can cancel the event.**
 `accessible`          | bool     | Yes      | true    | Set accessibility of dropdown modal and dropdown rows
 `keyboardShouldPersistTaps`    | enum('always', 'never', 'handled') | Yes | 'never' | See react-native `ScrollView` props
+`dropdownAccessibilityTraits`          | string     | Yes      | 'menuitem'    | Set accessibility trait on the focus trap for screen reader hints. (Web Only)
+`dropdownAccessibilityLabel`          | string     | Yes      |           | Add an aria label to the focus trap to help give users information about how to navigate the modal. (Web Only)
 
 ### Methods
 Method            |  Description
