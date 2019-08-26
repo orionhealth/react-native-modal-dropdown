@@ -6,6 +6,7 @@
 
 import React, {
   Component,
+  Fragment,
 } from 'react';
 
 import FocusTrap from './focus-trap';
@@ -15,23 +16,15 @@ import {
   Dimensions,
   View,
   Text,
-  ListView,
   TouchableWithoutFeedback,
-  TouchableNativeFeedback,
   TouchableOpacity,
   TouchableHighlight,
+  FlatList,
   ActivityIndicator,
 } from 'react-native';
 
 import Modal from './modal';
 import PropTypes from 'prop-types';
-
-const TOUCHABLE_ELEMENTS = [
-  'TouchableHighlight',
-  'TouchableOpacity',
-  'TouchableWithoutFeedback',
-  'TouchableNativeFeedback'
-];
 
 export default class ModalDropdown extends Component {
   static propTypes = {
@@ -61,7 +54,8 @@ export default class ModalDropdown extends Component {
 
     onDropdownWillShow: PropTypes.func,
     onDropdownWillHide: PropTypes.func,
-    onSelect: PropTypes.func
+    onSelect: PropTypes.func,
+    wrapWithTouchable: PropTypes.bool,
   };
 
   static defaultProps = {
@@ -74,6 +68,7 @@ export default class ModalDropdown extends Component {
     showsVerticalScrollIndicator: true,
     keyboardShouldPersistTaps: 'never',
     dropdownAccessibilityTraits: 'menuitem',
+    wrapWithTouchable: true,
   };
 
   constructor(props) {
@@ -292,13 +287,12 @@ export default class ModalDropdown extends Component {
   }
 
   _renderDropdown() {
-    const {scrollEnabled, renderSeparator, showsVerticalScrollIndicator, keyboardShouldPersistTaps} = this.props;
+    const {scrollEnabled, options, showsVerticalScrollIndicator, keyboardShouldPersistTaps} = this.props;
     return (
-      <ListView scrollEnabled={scrollEnabled}
+      <FlatList scrollEnabled={scrollEnabled}
                 style={styles.list}
-                dataSource={this._dataSource}
-                renderRow={this._renderRow}
-                renderSeparator={renderSeparator || this._renderSeparator}
+                data={options}
+                renderItem={this._renderRow}
                 automaticallyAdjustContentInsets={false}
                 showsVerticalScrollIndicator={showsVerticalScrollIndicator}
                 keyboardShouldPersistTaps={keyboardShouldPersistTaps}
@@ -306,90 +300,43 @@ export default class ModalDropdown extends Component {
     );
   }
 
-  get _dataSource() {
-    const {options} = this.props;
-    const ds = new ListView.DataSource({
-      rowHasChanged: (r1, r2) => r1 !== r2
-    });
-    return ds.cloneWithRows(options);
-  }
-
-  _renderRow = (rowData, sectionID, rowID, highlightRow) => {
-    const {renderRow, dropdownTextStyle, dropdownTextHighlightStyle, accessible} = this.props;
+  _renderRow = (rowData) => {
+    const {renderRow, wrapWithTouchable} = this.props;
     const {selectedIndex} = this.state;
-    const key = `row_${rowID}`;
-    const highlighted = rowID == selectedIndex;
-    const row = !renderRow ?
-      (<Text style={[
-        styles.rowText,
-        dropdownTextStyle,
-        highlighted && styles.highlightedRowText,
-        highlighted && dropdownTextHighlightStyle
-      ]}
-      >
-        {rowData}
-      </Text>) :
-      renderRow(rowData, rowID, highlighted);
+    const key = `row_${rowData.index}`;
+    const highlighted = rowData.index == selectedIndex;
     const preservedProps = {
       key,
-      accessible,
-      onPress: () => this._onRowPress(rowData, sectionID, rowID, highlightRow),
+      accessible: !wrapWithTouchable,
+      onPress: () => this._onRowPress(rowData),
     };
-    if (TOUCHABLE_ELEMENTS.find(name => name == row.type.displayName)) {
-      const props = {...row.props};
-      props.key = preservedProps.key;
-      props.onPress = preservedProps.onPress;
-      const {children} = row.props;
-      switch (row.type.displayName) {
-        case 'TouchableHighlight': {
-          return (
-            <TouchableHighlight {...props}>
-              {children}
-            </TouchableHighlight>
-          );
-        }
-        case 'TouchableOpacity': {
-          return (
-            <TouchableOpacity {...props}>
-              {children}
-            </TouchableOpacity>
-          );
-        }
-        case 'TouchableWithoutFeedback': {
-          return (
-            <TouchableWithoutFeedback {...props}>
-              {children}
-            </TouchableWithoutFeedback>
-          );
-        }
-        case 'TouchableNativeFeedback': {
-          return (
-            <TouchableNativeFeedback {...props}>
-              {children}
-            </TouchableNativeFeedback>
-          );
-        }
-        default:
-          break;
-      }
+    // This is the existing behaviour, which we probably will want to 
+    // transition away from so we can control the toucable element ourselves.
+    if (wrapWithTouchable) {
+      return (
+        <TouchableHighlight {...preservedProps}>
+          {renderRow(rowData.item, rowData.index, highlighted)}
+        </TouchableHighlight>
+      );
+    } else {
+      return (
+        <Fragment>
+          {renderRow(rowData.item, rowData.index, highlighted, preservedProps)}
+        </Fragment>
+      );
     }
-    return (
-      <TouchableHighlight {...preservedProps}>
-        {row}
-      </TouchableHighlight>
-    );
+    
   };
 
-  _onRowPress(rowData, sectionID, rowID, highlightRow) {
+  _onRowPress(rowData) {
     const {onSelect, renderButtonText, onDropdownWillHide} = this.props;
-    if (!onSelect || onSelect(rowID, rowData) !== false) {
-      highlightRow(sectionID, rowID);
+    if (!onSelect || onSelect(rowData) !== false) {
       const value = renderButtonText && renderButtonText(rowData) || rowData.toString();
       this._nextValue = value;
-      this._nextIndex = rowID;
+      this._nextIndex = rowData.index;
       this.setState({
         buttonText: value,
-        selectedIndex: rowID
+        selectedIndex: rowData.index,
       });
     }
     if (!onDropdownWillHide || onDropdownWillHide() !== false) {
@@ -398,15 +345,6 @@ export default class ModalDropdown extends Component {
       });
     }
   }
-
-  _renderSeparator = (sectionID, rowID, adjacentRowHighlighted) => {
-    const key = `spr_${rowID}`;
-    return (
-      <View style={styles.separator}
-            key={key}
-      />
-    );
-  };
 }
 
 const styles = StyleSheet.create({
